@@ -40,7 +40,7 @@ juntado AS (
 )
 
 SELECT
-    id_contrato, id_cliente, data_ref, cliente_sem_cadastro,
+    data_ref, id_contrato, id_cliente, cliente_sem_cadastro,
 
     -- brutas
     estado_civil, tipo_renda, nivel_educacao, ocupacao, tipo_organizacao, tipo_moradia,
