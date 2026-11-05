@@ -25,7 +25,7 @@ parcelas_vencidas AS (
     JOIN base_dividas d
       ON d.id_contrato = h.id_contrato
      AND COALESCE(d.previsto_invalido, 0) = 0
-     AND substr(d.data_prevista_pagamento, 1, 10) < e.data_ref   -- vencida até a data_ref
+     AND substr(d.data_prevista_pagamento, 1, 10) < e.data_ref  
 ),
  
 -- data de quitação olhando só pagamentos até a data_ref
@@ -48,13 +48,9 @@ parcelas_atraso AS (
     SELECT
         id_atual, id_contrato_ant, numero_parcela, data_prevista,
         CASE WHEN data_quitacao_asof IS NULL THEN 1 ELSE 0 END AS em_aberto,
-        -- dias desde o vencimento até a data_ref
         CAST(julianday(data_ref) - julianday(data_prevista) AS INTEGER) AS dias_desde_vcto,
-        -- quitada: data_quitacao - prevista | em aberto: data_ref - prevista
-        -- (pode ser negativo se pagou antes do vencimento)
         CAST(julianday(COALESCE(data_quitacao_asof, data_ref))
              - julianday(data_prevista) AS INTEGER) AS dias_atraso,
-        -- janelas por data de vencimento
         CASE WHEN data_prevista >= date(data_ref, '-3 months')  THEN 1 ELSE 0 END AS dentro_3m,
         CASE WHEN data_prevista >= date(data_ref, '-6 months')  THEN 1 ELSE 0 END AS dentro_6m,
         CASE WHEN data_prevista >= date(data_ref, '-12 months') THEN 1 ELSE 0 END AS dentro_12m
@@ -64,13 +60,10 @@ parcelas_atraso AS (
 parcelas_atraso_rank AS (
     SELECT
         *,
-        -- atraso nunca negativo: pagar antes do vencimento = 0 dias de atraso
         MAX(dias_atraso, 0) AS dias_atraso_pos,
-        -- parcela com maior atraso (empate: vencimento mais recente)
         ROW_NUMBER() OVER (PARTITION BY id_atual
                            ORDER BY dias_atraso DESC, data_prevista DESC,
                                     id_contrato_ant DESC, numero_parcela DESC) AS rn_maior_atraso,
-        -- parcela vencida mais recente
         ROW_NUMBER() OVER (PARTITION BY id_atual
                            ORDER BY data_prevista DESC,
                                     id_contrato_ant DESC, numero_parcela DESC) AS rn_ultima_parcela
@@ -109,7 +102,7 @@ atraso_ultimo_contrato AS (
 resumo AS (
     SELECT
         id_atual,
- 
+        
         SUM(CASE WHEN 1 = 1 THEN 1 ELSE 0 END) AS qtd_parcelas_vencidas_vida,
         SUM(CASE WHEN dias_atraso > 0 THEN 1 ELSE 0 END) AS qtd_parcelas_atrasadas_vida,
         SUM(CASE WHEN dias_atraso > 5 THEN 1 ELSE 0 END) AS qtd_atraso_5d_vida,
@@ -143,30 +136,25 @@ resumo AS (
         SUM(CASE WHEN dentro_12m = 1 AND dias_atraso > 90 THEN 1 ELSE 0 END) AS qtd_atraso_90d_12m,
         SUM(CASE WHEN dentro_12m = 1 AND dias_atraso > 120 THEN 1 ELSE 0 END) AS qtd_atraso_maior_120d_12m,
  
-        -- médias para a tendência (parcelas com vencimento nos últimos 3 e 12 meses)
         AVG(CASE WHEN dentro_3m = 1  THEN dias_atraso_pos END) AS atraso_medio_3m,
         AVG(CASE WHEN dentro_12m = 1 THEN dias_atraso_pos END) AS atraso_medio_12m,
  
         AVG(dias_atraso_pos)                               AS atraso_medio,
         MAX(dias_atraso_pos)                               AS atraso_max,
  
-        -- dias desde o vencimento da parcela que teve o maior atraso (NULL se nunca atrasou)
         MAX(CASE WHEN rn_maior_atraso = 1 AND dias_atraso > 0
                  THEN dias_desde_vcto END)                 AS dias_max_atraso,
  
-        -- atraso da parcela vencida mais recente
         MAX(CASE WHEN rn_ultima_parcela = 1
                  THEN dias_atraso_pos END)                 AS atraso_ultima_parcela,
  
-        -- dias entre a data_ref e o vencimento da última parcela com atraso > X dias
-        -- (vencimento mais recente = menor dias_desde_vcto; NULL se nunca passou de X dias)
+
         MIN(CASE WHEN dias_atraso > 0   THEN dias_desde_vcto END) AS dias_desde_ultimo_atraso_maior_0d,
         MIN(CASE WHEN dias_atraso > 30  THEN dias_desde_vcto END) AS dias_desde_ultimo_atraso_maior_30d,
         MIN(CASE WHEN dias_atraso > 60  THEN dias_desde_vcto END) AS dias_desde_ultimo_atraso_maior_60d,
         MIN(CASE WHEN dias_atraso > 90  THEN dias_desde_vcto END) AS dias_desde_ultimo_atraso_maior_90d,
         MIN(CASE WHEN dias_atraso > 120 THEN dias_desde_vcto END) AS dias_desde_ultimo_atraso_maior_120d,
  
-        -- maior atraso entre parcelas ainda não pagas na data_ref (0 se não há parcela em aberto)
         COALESCE(MAX(CASE WHEN em_aberto = 1
                           THEN dias_atraso_pos END), 0)    AS dpd_atual_max,
  
@@ -179,8 +167,7 @@ resumo AS (
  
 SELECT
     e.data_ref, e.id_contrato, e.id_cliente,
- 
-    -- quantidades (0 quando não há parcela vencida na janela)
+
     COALESCE(r.qtd_parcelas_vencidas_vida, 0) AS qtd_parcelas_vencidas_vida,
     COALESCE(r.qtd_parcelas_atrasadas_vida, 0) AS qtd_parcelas_atrasadas_vida,
     COALESCE(r.qtd_atraso_5d_vida, 0) AS qtd_atraso_5d_vida,
@@ -217,7 +204,6 @@ SELECT
     COALESCE(r.qtd_atraso_90d_12m, 0) AS qtd_atraso_90d_12m,
     COALESCE(r.qtd_atraso_maior_120d_12m, 0) AS qtd_atraso_maior_120d_12m,
  
-    -- proporções (NULL quando não há parcela vencida na janela)
     1.0 * r.qtd_parcelas_atrasadas_vida / r.qtd_parcelas_vencidas_vida AS pct_parcelas_atrasadas_vida,
     1.0 * r.qtd_atraso_5d_vida / r.qtd_parcelas_vencidas_vida AS pct_atraso_5d_vida,
     1.0 * r.qtd_atraso_15d_vida / r.qtd_parcelas_vencidas_vida AS pct_atraso_15d_vida,
@@ -250,7 +236,6 @@ SELECT
     1.0 * r.qtd_atraso_90d_12m / r.qtd_parcelas_vencidas_12m AS pct_atraso_90d_12m,
     1.0 * r.qtd_atraso_maior_120d_12m / r.qtd_parcelas_vencidas_12m AS pct_atraso_maior_120d_12m,
  
-    -- severidade e recência (NULL quando o cliente não tem parcela vencida)
     r.atraso_medio,
     r.atraso_max,
     r.dias_max_atraso,
@@ -262,13 +247,11 @@ SELECT
     r.dias_desde_ultimo_atraso_maior_120d,
     r.dpd_atual_max,
  
-    -- positivo = piora recente (atraso médio 3m - atraso médio 12m); NULL se faltar parcela em alguma janela
+
     r.atraso_medio_3m - r.atraso_medio_12m AS tendencia_atraso,
  
-    -- maior atraso do contrato anterior mais recente (NULL se ele ainda não tinha parcela vencida)
     u.atraso_max_ultimo_contrato,
  
-    -- flags "ever" (0 quando não há histórico; veja qtd_parcelas_vencidas_vida = 0)
     COALESCE(r.flag_ever_30d, 0) AS flag_ever_30d,
     COALESCE(r.flag_ever_60d, 0) AS flag_ever_60d,
     COALESCE(r.flag_ever_90d, 0) AS flag_ever_90d
