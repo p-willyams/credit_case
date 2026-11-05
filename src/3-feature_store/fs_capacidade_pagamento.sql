@@ -65,7 +65,7 @@ medias AS (
 )
 
 SELECT
-    a.id_contrato, a.id_cliente, a.data_ref, a.status_contrato,
+    a.data_ref, a.id_contrato, a.id_cliente, a.status_contrato,
 
     COALESCE(m.qtd_contratos_anteriores, 0) AS qtd_contratos_anteriores,
     COALESCE(e.qtd_contratos_abertos, 0)    AS qtd_contratos_abertos,

@@ -48,7 +48,7 @@ resumo AS (
 )
 
 SELECT
-    a.id_contrato, a.id_cliente, a.data_ref,
+    a.data_ref, a.id_contrato, a.id_cliente,
     a.tipo_contrato, a.valor_credito, a.valor_bem, a.valor_parcela,
 
     a.dia_semana_solicitacao AS dia_semana,
