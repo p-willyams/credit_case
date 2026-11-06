@@ -45,36 +45,64 @@ resumo AS (
         MAX(CASE WHEN ordem = 1 THEN parcela_ant END)  AS parcela_ultima
     FROM anteriores
     GROUP BY id_atual
+),
+
+tb_features AS (
+
+    SELECT
+        a.data_ref, a.id_contrato, a.id_cliente,
+        a.tipo_contrato, a.valor_credito, a.valor_bem, a.valor_parcela,
+
+        a.dia_semana_solicitacao AS dia_semana,
+        CASE WHEN a.dia_semana_solicitacao IS NULL THEN NULL
+            WHEN a.dia_semana_solicitacao IN ('Sábado', 'Domingo') THEN 1 ELSE 0 END AS flag_fim_de_semana,
+        CAST(substr(a.hora_solicitacao, 1, 2) AS INTEGER) AS hora,                -- assume 'HH...': validar o formato
+        CASE WHEN CAST(substr(a.hora_solicitacao, 1, 2) AS INTEGER) < 6  THEN 'madrugada'
+            WHEN CAST(substr(a.hora_solicitacao, 1, 2) AS INTEGER) < 12 THEN 'manha'
+            WHEN CAST(substr(a.hora_solicitacao, 1, 2) AS INTEGER) < 18 THEN 'tarde'
+            ELSE 'noite' END AS faixa_horaria,
+
+        CASE WHEN a.valor_bem IS NULL OR a.valor_bem = 0 THEN 1 ELSE 0 END AS flag_sem_bem,
+        1.0 * a.valor_bem / c.renda_anual                               AS valor_bem_sobre_renda_anual,
+        1.0 * (a.valor_bem - a.valor_credito) / a.valor_bem             AS entrada_implicita_pct,
+        1.0 * a.valor_credito / a.valor_bem                             AS credito_sobre_valor_bem,
+        1.0 * a.valor_parcela / a.valor_credito                         AS parcela_sobre_credito,
+        1.0 * a.valor_credito / a.valor_parcela                         AS prazo_implicito,
+
+
+        a.valor_credito - r.credito_ultimo                              AS desvio_credito_vs_ultimo,
+        1.0 * (a.valor_credito - r.credito_ultimo) / r.credito_ultimo   AS variacao_credito_vs_ultimo_pct,
+        1.0 * (a.valor_parcela - r.parcela_ultima) / r.parcela_ultima   AS variacao_parcela_vs_ultima_pct,
+        CASE WHEN a.valor_credito IS NULL OR r.max_credito_historico IS NULL THEN NULL
+            WHEN a.valor_credito > r.max_credito_historico THEN 1 ELSE 0 END AS flag_credito_acima_max_historico,
+        CASE WHEN r.qtd_anteriores IS NULL THEN NULL
+            WHEN r.tipo_ja_existia = 1 THEN 0 ELSE 1 END                     AS flag_novo_tipo_contrato
+    FROM atual a
+    LEFT JOIN base_cadastral c ON c.id_cliente = a.id_cliente
+    LEFT JOIN resumo r         ON r.id_atual   = a.id_contrato
+
 )
 
-SELECT
-    a.data_ref, a.id_contrato, a.id_cliente,
-    a.tipo_contrato, a.valor_credito, a.valor_bem, a.valor_parcela,
-
-    a.dia_semana_solicitacao AS dia_semana,
-    CASE WHEN a.dia_semana_solicitacao IS NULL THEN NULL
-         WHEN a.dia_semana_solicitacao IN ('Sábado', 'Domingo') THEN 1 ELSE 0 END AS flag_fim_de_semana,
-    CAST(substr(a.hora_solicitacao, 1, 2) AS INTEGER) AS hora,                -- assume 'HH...': validar o formato
-    CASE WHEN CAST(substr(a.hora_solicitacao, 1, 2) AS INTEGER) < 6  THEN 'madrugada'
-         WHEN CAST(substr(a.hora_solicitacao, 1, 2) AS INTEGER) < 12 THEN 'manha'
-         WHEN CAST(substr(a.hora_solicitacao, 1, 2) AS INTEGER) < 18 THEN 'tarde'
-         ELSE 'noite' END AS faixa_horaria,
-
-    CASE WHEN a.valor_bem IS NULL OR a.valor_bem = 0 THEN 1 ELSE 0 END AS flag_sem_bem,
-    1.0 * a.valor_bem / c.renda_anual                               AS valor_bem_sobre_renda_anual,
-    1.0 * (a.valor_bem - a.valor_credito) / a.valor_bem             AS entrada_implicita_pct,
-    1.0 * a.valor_credito / a.valor_bem                             AS credito_sobre_valor_bem,
-    1.0 * a.valor_parcela / a.valor_credito                         AS parcela_sobre_credito,
-    1.0 * a.valor_credito / a.valor_parcela                         AS prazo_implicito,
-
-
-    a.valor_credito - r.credito_ultimo                              AS desvio_credito_vs_ultimo,
-    1.0 * (a.valor_credito - r.credito_ultimo) / r.credito_ultimo   AS variacao_credito_vs_ultimo_pct,
-    1.0 * (a.valor_parcela - r.parcela_ultima) / r.parcela_ultima   AS variacao_parcela_vs_ultima_pct,
-    CASE WHEN a.valor_credito IS NULL OR r.max_credito_historico IS NULL THEN NULL
-         WHEN a.valor_credito > r.max_credito_historico THEN 1 ELSE 0 END AS flag_credito_acima_max_historico,
-    CASE WHEN r.qtd_anteriores IS NULL THEN NULL
-         WHEN r.tipo_ja_existia = 1 THEN 0 ELSE 1 END                     AS flag_novo_tipo_contrato
-FROM atual a
-LEFT JOIN base_cadastral c ON c.id_cliente = a.id_cliente
-LEFT JOIN resumo r         ON r.id_atual   = a.id_contrato;
+SELECT  data_ref, 
+        id_contrato, 
+        id_cliente,
+        tipo_contrato, 
+        valor_credito, 
+        valor_bem, 
+        valor_parcela,
+        dia_semana,
+        flag_fim_de_semana,
+        hora,
+        faixa_horaria,
+        flag_sem_bem,
+        valor_bem_sobre_renda_anual,
+        entrada_implicita_pct,
+        credito_sobre_valor_bem,
+        parcela_sobre_credito,
+        prazo_implicito,
+        desvio_credito_vs_ultimo,
+        variacao_credito_vs_ultimo_pct,
+        variacao_parcela_vs_ultima_pct,
+        flag_credito_acima_max_historico,
+        flag_novo_tipo_contrato
+FROM tb_features
