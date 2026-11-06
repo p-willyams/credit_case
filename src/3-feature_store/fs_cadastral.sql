@@ -37,41 +37,74 @@ juntado AS (
              THEN (julianday(a.data_ref) - julianday(c.data_nascimento)) / 365.25 END AS idade
     FROM tb_emprestimos a
     LEFT JOIN tb_cadastral c ON c.id_cliente = a.id_cliente
+),
+
+tb_features AS (
+    SELECT
+        data_ref, id_contrato, id_cliente, cliente_sem_cadastro,
+
+        -- brutas
+        estado_civil, tipo_renda, nivel_educacao, ocupacao, tipo_organizacao, tipo_moradia,
+        possui_carro, possui_imovel,
+        qtd_filhos, qtd_membros_familia, renda_anual,
+        nota_regiao_cliente, nota_regiao_cliente_cidade,
+
+        -- derivadas
+        idade,
+        renda_mensal,
+        renda_mensal / qtd_membros_familia                  AS renda_per_capita,
+        MIN(1.0, 1.0 * qtd_filhos / qtd_membros_familia)    AS pct_filhos_familia,
+        MAX(0, qtd_membros_familia - qtd_filhos)            AS qtd_adultos_familia,
+        possui_carro + possui_imovel                        AS score_patrimonio,        -- NULL se algum não for informado
+        nota_regiao_cliente - nota_regiao_cliente_cidade    AS diff_nota_regiao,
+
+        -- flags (cliente sem cadastro cai como ausente, porque os campos ficam NULL)
+        CASE WHEN renda_anual IS NULL THEN 1 ELSE 0 END                            AS flag_renda_ausente,
+        CASE WHEN qtd_membros_familia IS NULL THEN 1 ELSE 0 END                    AS flag_membros_invalido,
+        CASE WHEN ocupacao IN ('Não informado', 'Sem cadastro') THEN 1 ELSE 0 END  AS flag_ocupacao_ausente,
+        CASE WHEN idade IS NULL THEN 1 ELSE 0 END                                  AS flag_data_nascimento_invalida,
+
+        -- campos ausentes entre os 14 do cadastro (sem cadastro = 14)
+        CASE WHEN cliente_sem_cadastro = 1 THEN 14 ELSE
+            (estado_civil     = 'Não informado') + (tipo_renda       = 'Não informado')
+        + (nivel_educacao   = 'Não informado') + (ocupacao         = 'Não informado')
+        + (tipo_organizacao = 'Não informado') + (tipo_moradia     = 'Não informado')
+        + (possui_carro IS NULL) + (possui_imovel IS NULL)
+        + (qtd_filhos IS NULL) + (qtd_membros_familia IS NULL) + (renda_anual IS NULL)
+        + (nota_regiao_cliente IS NULL) + (nota_regiao_cliente_cidade IS NULL)
+        + (data_nascimento IS NULL)
+        END AS qtd_campos_ausentes
+    FROM juntado
+
 )
 
-SELECT
-    data_ref, id_contrato, id_cliente, cliente_sem_cadastro,
 
-    -- brutas
-    estado_civil, tipo_renda, nivel_educacao, ocupacao, tipo_organizacao, tipo_moradia,
-    possui_carro, possui_imovel,
-    qtd_filhos, qtd_membros_familia, renda_anual,
-    nota_regiao_cliente, nota_regiao_cliente_cidade,
-
-    -- derivadas
-    idade,
-    renda_mensal,
-    renda_mensal / qtd_membros_familia                  AS renda_per_capita,
-    MIN(1.0, 1.0 * qtd_filhos / qtd_membros_familia)    AS pct_filhos_familia,
-    MAX(0, qtd_membros_familia - qtd_filhos)            AS qtd_adultos_familia,
-    possui_carro + possui_imovel                        AS score_patrimonio,        -- NULL se algum não for informado
-    nota_regiao_cliente - nota_regiao_cliente_cidade    AS diff_nota_regiao,
-
-    -- flags (cliente sem cadastro cai como ausente, porque os campos ficam NULL)
-    CASE WHEN renda_anual IS NULL THEN 1 ELSE 0 END                            AS flag_renda_ausente,
-    CASE WHEN qtd_membros_familia IS NULL THEN 1 ELSE 0 END                    AS flag_membros_invalido,
-    CASE WHEN ocupacao IN ('Não informado', 'Sem cadastro') THEN 1 ELSE 0 END  AS flag_ocupacao_ausente,
-    CASE WHEN idade IS NULL THEN 1 ELSE 0 END                                  AS flag_data_nascimento_invalida,
-
-    -- campos ausentes entre os 14 do cadastro (sem cadastro = 14)
-    CASE WHEN cliente_sem_cadastro = 1 THEN 14 ELSE
-        (estado_civil     = 'Não informado') + (tipo_renda       = 'Não informado')
-      + (nivel_educacao   = 'Não informado') + (ocupacao         = 'Não informado')
-      + (tipo_organizacao = 'Não informado') + (tipo_moradia     = 'Não informado')
-      + (possui_carro IS NULL) + (possui_imovel IS NULL)
-      + (qtd_filhos IS NULL) + (qtd_membros_familia IS NULL) + (renda_anual IS NULL)
-      + (nota_regiao_cliente IS NULL) + (nota_regiao_cliente_cidade IS NULL)
-      + (data_nascimento IS NULL)
-    END AS qtd_campos_ausentes
-FROM juntado;
-
+SELECT  data_ref, 
+        id_contrato, 
+        id_cliente,
+        estado_civil, 
+        tipo_renda, 
+        nivel_educacao, 
+        ocupacao, 
+        tipo_organizacao, 
+        tipo_moradia,
+        possui_carro, 
+        possui_imovel,
+        qtd_filhos, 
+        qtd_membros_familia, 
+        renda_anual,
+        nota_regiao_cliente, 
+        nota_regiao_cliente_cidade,
+        idade,
+        renda_mensal,
+        renda_per_capita,
+        pct_filhos_familia,
+        qtd_adultos_familia,
+        score_patrimonio,
+        diff_nota_regiao,
+        flag_renda_ausente,
+        flag_membros_invalido,
+        flag_ocupacao_ausente,
+        flag_data_nascimento_invalida,
+        qtd_campos_ausentes
+FROM tb_features 

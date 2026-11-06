@@ -62,24 +62,44 @@ medias AS (
            AVG(valor_parcela)    AS media_parcela_historica
     FROM anteriores
     GROUP BY id_atual
+),
+
+tb_features AS (
+    SELECT
+        a.data_ref, a.id_contrato, a.id_cliente, a.status_contrato,
+
+        COALESCE(m.qtd_contratos_anteriores, 0) AS qtd_contratos_anteriores,
+        COALESCE(e.qtd_contratos_abertos, 0)    AS qtd_contratos_abertos,
+        COALESCE(e.parcela_mensal_aberta, 0)    AS parcela_mensal_aberta,
+        COALESCE(e.saldo_aberto_estimado, 0)    AS saldo_aberto_estimado,
+        COALESCE(e.carteira_incompleta, 0)      AS carteira_incompleta,
+
+        a.valor_parcela_atual / (c.renda_anual / 12.0)                                        AS parcela_sobre_renda_mensal,
+        a.valor_credito_atual / c.renda_anual                                                 AS credito_sobre_renda_anual,
+        (a.valor_parcela_atual + COALESCE(e.parcela_mensal_aberta, 0)) / (c.renda_anual / 12.0) AS comprometimento_renda,
+        (a.valor_credito_atual + COALESCE(e.saldo_aberto_estimado, 0)) / c.renda_anual        AS exposicao_total_sobre_renda,
+        a.valor_credito_atual / m.media_credito_historico                                     AS credito_atual_sobre_media_historica,
+        a.valor_parcela_atual / m.media_parcela_historica                                     AS parcela_atual_sobre_parcela_media_hist
+    FROM atual a
+    LEFT JOIN base_cadastral c ON c.id_cliente = a.id_cliente
+    LEFT JOIN medias    m ON m.id_atual = a.id_contrato
+    LEFT JOIN exposicao e ON e.id_atual = a.id_contrato
 )
 
-SELECT
-    a.data_ref, a.id_contrato, a.id_cliente, a.status_contrato,
+SELECT  data_ref, 
+        id_contrato, 
+        id_cliente, 
+        status_contrato,
+        qtd_contratos_anteriores,
+        qtd_contratos_abertos,
+        parcela_mensal_aberta,
+        saldo_aberto_estimado,
+        carteira_incompleta,
+        parcela_sobre_renda_mensal,
+        credito_sobre_renda_anual,
+        comprometimento_renda,
+        exposicao_total_sobre_renda,
+        credito_atual_sobre_media_historica,
+        parcela_atual_sobre_parcela_media_hist
 
-    COALESCE(m.qtd_contratos_anteriores, 0) AS qtd_contratos_anteriores,
-    COALESCE(e.qtd_contratos_abertos, 0)    AS qtd_contratos_abertos,
-    COALESCE(e.parcela_mensal_aberta, 0)    AS parcela_mensal_aberta,
-    COALESCE(e.saldo_aberto_estimado, 0)    AS saldo_aberto_estimado,
-    COALESCE(e.carteira_incompleta, 0)      AS carteira_incompleta,
-
-    a.valor_parcela_atual / (c.renda_anual / 12.0)                                        AS parcela_sobre_renda_mensal,
-    a.valor_credito_atual / c.renda_anual                                                 AS credito_sobre_renda_anual,
-    (a.valor_parcela_atual + COALESCE(e.parcela_mensal_aberta, 0)) / (c.renda_anual / 12.0) AS comprometimento_renda,
-    (a.valor_credito_atual + COALESCE(e.saldo_aberto_estimado, 0)) / c.renda_anual        AS exposicao_total_sobre_renda,
-    a.valor_credito_atual / m.media_credito_historico                                     AS credito_atual_sobre_media_historica,
-    a.valor_parcela_atual / m.media_parcela_historica                                     AS parcela_atual_sobre_parcela_media_hist
-FROM atual a
-LEFT JOIN base_cadastral c ON c.id_cliente = a.id_cliente
-LEFT JOIN medias    m ON m.id_atual = a.id_contrato
-LEFT JOIN exposicao e ON e.id_atual = a.id_contrato;
+FROM tb_features
