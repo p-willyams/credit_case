@@ -262,7 +262,8 @@ tb_features AS (
 
 )
 
-SELECT  data_ref, 
+SELECT  
+        data_ref, 
         id_contrato, 
         id_cliente, 
         qtd_parcelas_vencidas_vida,
