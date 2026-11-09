@@ -86,7 +86,8 @@ tb_features AS (
     LEFT JOIN exposicao e ON e.id_atual = a.id_contrato
 )
 
-SELECT  data_ref, 
+SELECT  
+        data_ref, 
         id_contrato, 
         id_cliente, 
         status_contrato,

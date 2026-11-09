@@ -328,7 +328,8 @@ tb_features AS (
     LEFT JOIN resumo_estimado re            ON re.id_atual  = e.id_contrato
 )
 
-SELECT  data_ref, 
+SELECT  
+        data_ref, 
         id_contrato, 
         id_cliente, 
         qtd_contratos_ativos,
