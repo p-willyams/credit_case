@@ -20,8 +20,6 @@ contratos_prev AS (
      AND h.status_contrato = 'Aprovado'
      AND h.id_contrato <> e.id_contrato
      AND substr(h.data_decisao, 1, 10) < e.data_ref
-     AND h.data_liberacao IS NOT NULL
-     AND substr(h.data_liberacao, 1, 10) <= e.data_ref
 ),
 
 contratos_ativos AS (
