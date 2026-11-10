@@ -93,7 +93,7 @@ historico AS (
         COUNT(DISTINCT CASE WHEN h.tipo_produto <> 'Não informado' THEN h.tipo_produto END) AS qtd_tipos_produto_distintos,
 
         -- área de venda
-        SUM(h.flag_sem_area) AS qtd_sem_area,
+        SUM(h.area_venda_sem_area) AS qtd_sem_area,
         COUNT(DISTINCT h.area_real) AS qtd_areas_distintas,
 
         -- finalidade do empréstimo
