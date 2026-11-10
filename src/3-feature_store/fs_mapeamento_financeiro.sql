@@ -25,8 +25,8 @@ anteriores AS (
         e.tipo_contrato_atual,
         NULLIF(h.qtd_parcelas_planejadas, 0) AS parcelas_planejadas,
         h.percentual_entrada AS pct_entrada,
-        CASE WHEN h.flag_seguro_contratado IS NULL THEN NULL
-             WHEN h.flag_seguro_contratado = 1 THEN 1.0 ELSE 0.0 END AS com_seguro,
+        CASE WHEN h.indicador_seguro_contratado IS NULL THEN NULL
+             WHEN h.indicador_seguro_contratado = 1 THEN 1.0 ELSE 0.0 END AS com_seguro,
         -- contrato aberto na data_ref: liberado e ainda não encerrado
         CASE WHEN h.data_liberacao IS NOT NULL
               AND substr(h.data_liberacao, 1, 10) <= e.data_ref
